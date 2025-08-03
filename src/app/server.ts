@@ -1,8 +1,8 @@
 import * as net from "net";
-import { getContentLength } from "./utils";
-import { parseHttpRequest } from "./request-parser";
-import { buildHttpResponse } from "./response-builder";
-import { routeRequest } from "./router";
+import { getContentLength } from "../utils/common";
+import { parseHttpRequest } from "../utils/request-parser";
+import { buildHttpResponse } from "../utils/response-builder";
+import { routeRequest } from "../utils/router";
 
 const server = net.createServer((socket) => {
     let buffer = "";

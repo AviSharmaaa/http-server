@@ -1,4 +1,4 @@
-import { parseHeaders } from "./utils";
+import { parseHeaders } from "./common";
 
 export function parseHttpRequest(raw: string): HttpRequest {
     const [headerPart, body = ""] = raw.split("\r\n\r\n");
