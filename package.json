@@ -1,4 +1,9 @@
 {
+  "scripts": {
+    "build": "tsc",
+    "start:http": "node dist/app/server.js",
+    "start:https": "node dist/app/https-server.js"
+  },
   "devDependencies": {
     "@types/node": "^24.1.0",
     "typescript": "^5.9.2"
