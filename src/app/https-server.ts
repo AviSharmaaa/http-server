@@ -1,11 +1,8 @@
 import tls from "tls";
 import fs from "fs";
-import { getContentLength } from "../utils/common";
-import { parseHttpRequest } from "../utils/request-parser";
-import { buildHttpResponse } from "../utils/response-builder";
-import { routeRequest } from "../utils/router";
 import { registerRoutes } from "../utils/routes";
 import { registerMiddlewares } from "../utils/middlewares";
+import handleRawHttpData from "../utils/handle-raw-http-data";
 
 registerRoutes();
 registerMiddlewares();
@@ -17,34 +14,9 @@ const options = {
 };
 
 const server = tls.createServer(options, (socket) => {
-    let buffer = "";
+    let bufferRef = { buffer: "" }
 
-    socket.on("data", (chunk) => {
-        buffer += chunk.toString();
-
-        if (!buffer.includes("\r\n\r\n")) return;
-
-        const headerEndIndex = buffer.indexOf("\r\n\r\n") + 4;
-        const headerPart = buffer.slice(0, headerEndIndex);
-        const { headers } = parseHttpRequest(headerPart);
-        const contentLength = getContentLength(headers);
-
-        const totalLength = headerEndIndex + contentLength;
-        if (buffer.length < totalLength) return;
-
-        const fullRequest = buffer.slice(0, totalLength);
-        buffer = buffer.slice(totalLength); // keep-alive
-
-        const req = parseHttpRequest(fullRequest);
-        const res = routeRequest(req);
-        const rawResponse = buildHttpResponse(res);
-
-        socket.write(rawResponse);
-
-        if (req.headers["connection"] === "close") {
-            socket.end();
-        }
-    });
+    socket.on("data", (chunk) => { handleRawHttpData(bufferRef, chunk, socket) });
 
     socket.on("error", (err) => {
         console.error("TLS Socket error:", err);
