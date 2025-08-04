@@ -1,37 +1,28 @@
-export function routeRequest(req: HttpRequest): HttpResponse {
-    const { method, path, query, body } = req;
+type RouteHandler = (req: HttpRequest) => HttpResponse
 
-    // GET example with query params
-    if (method === "GET" && path === "/search") {
-        return {
-            statusCode: 200,
-            body: `You searched for: ${JSON.stringify(query)}`,
-        };
+export const routes: Record<string, Record<string, RouteHandler>> = {
+    GET: {},
+    POST: {},
+    PUT: {},
+    PATCH: {},
+    DELETE: {},
+}
+
+//register/add a route
+export const addRoute = (method: string, path: string, handler: RouteHandler) => {
+    const methodUpper = method.toUpperCase()
+
+    if (!routes[methodUpper]) routes[methodUpper] = {}
+    routes[methodUpper][path] = handler
+}
+
+export const routeRequest = (req: HttpRequest): HttpResponse => {
+    const methodRoutes = routes[req.method]
+    const handler = methodRoutes[req.path]
+
+    if (!handler) {
+        return { statusCode: 404, body: "Not Found" }
     }
 
-    // POST example
-    if (method === "POST" && path === "/echo") {
-        return {
-            statusCode: 200,
-            body: `POST body: ${body}`,
-        };
-    }
-
-    // PUT example
-    if (method === "PUT" && path === "/update") {
-        return {
-            statusCode: 200,
-            body: `Updated with: ${body}`,
-        };
-    }
-
-    // DELETE example
-    if (method === "DELETE" && path === "/remove") {
-        return {
-            statusCode: 200,
-            body: `Deleted resource`,
-        };
-    }
-
-    return { statusCode: 404, body: "Not Found" };
+    return handler(req)
 }

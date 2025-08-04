@@ -4,6 +4,9 @@ import { getContentLength } from "../utils/common";
 import { parseHttpRequest } from "../utils/request-parser";
 import { buildHttpResponse } from "../utils/response-builder";
 import { routeRequest } from "../utils/router";
+import { registerRoutes } from "../utils/routes";
+
+registerRoutes();
 
 const options = {
     key: fs.readFileSync("server.key"),
