@@ -6,8 +6,8 @@ import { buildHttpResponse } from "../utils/response-builder";
 import { routeRequest } from "../utils/router";
 
 const options = {
-    key: fs.readFileSync("key.pem"),
-    cert: fs.readFileSync("cert.pem"),
+    key: fs.readFileSync("server.key"),
+    cert: fs.readFileSync("server.crt"),
 };
 
 const server = tls.createServer(options, (socket) => {

@@ -1,10 +1,36 @@
 export function routeRequest(req: HttpRequest): HttpResponse {
-    if (req.method === "GET" && req.path === "/") {
-        return { statusCode: 200, body: "Hello from raw HTTP server!" };
+    const { method, path, query, body } = req;
+
+    // GET example with query params
+    if (method === "GET" && path === "/search") {
+        return {
+            statusCode: 200,
+            body: `You searched for: ${JSON.stringify(query)}`,
+        };
     }
 
-    if (req.method === "POST" && req.path === "/echo") {
-        return { statusCode: 200, body: `You sent: ${req.body}` };
+    // POST example
+    if (method === "POST" && path === "/echo") {
+        return {
+            statusCode: 200,
+            body: `POST body: ${body}`,
+        };
+    }
+
+    // PUT example
+    if (method === "PUT" && path === "/update") {
+        return {
+            statusCode: 200,
+            body: `Updated with: ${body}`,
+        };
+    }
+
+    // DELETE example
+    if (method === "DELETE" && path === "/remove") {
+        return {
+            statusCode: 200,
+            body: `Deleted resource`,
+        };
     }
 
     return { statusCode: 404, body: "Not Found" };

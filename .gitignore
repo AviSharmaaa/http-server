@@ -22,6 +22,8 @@ dist-ssr
 # misc
 .DS_Store
 *.pem
+*.crt
+*.key
 
 # debug
 npm-debug.log*
