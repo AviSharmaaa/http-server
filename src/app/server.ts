@@ -4,8 +4,10 @@ import { parseHttpRequest } from "../utils/request-parser";
 import { buildHttpResponse } from "../utils/response-builder";
 import { routeRequest } from "../utils/router";
 import { registerRoutes } from "../utils/routes";
+import { registerMiddlewares } from "../utils/middlewares";
 
 registerRoutes();
+registerMiddlewares();
 
 const server = net.createServer((socket) => {
     let buffer = "";
