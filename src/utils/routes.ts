@@ -8,7 +8,7 @@ export function registerRoutes() {
 
     addRoute("POST", "/echo", (req) => ({
         statusCode: 200,
-        body: `POST body: ${req.body}`,
+        body: `POST body: ${JSON.stringify(req.body)}`,
     }));
 
     addRoute("PUT", "/update", (req) => ({

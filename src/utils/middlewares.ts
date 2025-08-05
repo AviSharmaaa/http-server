@@ -1,3 +1,4 @@
+import { bodyParser } from "./body-parser";
 import { use } from "./router";
 
 export function registerMiddlewares() {
@@ -5,4 +6,5 @@ export function registerMiddlewares() {
         console.log(`📥 ${req.method} ${req.path}`);
         return next()
     })
+    use(bodyParser({ limit: 1024 * 1024 }))
 }
