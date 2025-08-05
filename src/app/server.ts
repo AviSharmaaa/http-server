@@ -3,8 +3,8 @@ import { registerRoutes } from "../utils/routes";
 import { registerMiddlewares } from "../utils/middlewares";
 import handleRawHttpData from "../utils/handle-raw-http-data";
 
-registerRoutes();
 registerMiddlewares();
+registerRoutes();
 
 const server = net.createServer((socket) => {
     const bufferRef = { buffer: "" }
