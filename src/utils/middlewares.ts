@@ -1,4 +1,5 @@
 import { bodyParser } from "./body-parser";
+import { cookieParser } from "./cookie-parser";
 import cors from "./cors";
 import { use } from "./router";
 
@@ -11,5 +12,6 @@ export function registerMiddlewares() {
         console.log(`📥 ${req.method} ${req.path}`);
         return next();
     });
+    use(cookieParser())
     use(bodyParser({ limit: 1024 * 1024 }));
 }

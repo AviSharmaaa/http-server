@@ -8,8 +8,8 @@ function parseQueryString(queryString: string): Record<string, string> {
     queryString.split("&").forEach((pair) => {
         if (!pair) return;
         const [rawKey, rawValue = ""] = pair.split("=");
-        const key = decodeURIComponent(rawKey || "").trim()
-        const value = decodeURIComponent(rawValue || "").trim()
+        const key = decodeURIComponent(rawKey.replace(/\+/g, " ")).trim()
+        const value = decodeURIComponent(rawValue.replace(/\+/g, " ")).trim()
 
         if (key) {
             queryParams[key] = value
