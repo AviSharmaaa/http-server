@@ -20,5 +20,4 @@ export function registerRoutes() {
         statusCode: 200,
         body: `Deleted resource`,
     }));
-
 }

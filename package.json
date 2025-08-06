@@ -5,7 +5,11 @@
     "start:https": "node dist/app/https-server.js"
   },
   "devDependencies": {
+    "@types/mime-types": "^3.0.1",
     "@types/node": "^24.1.0",
     "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "mime-types": "^3.0.1"
   }
 }

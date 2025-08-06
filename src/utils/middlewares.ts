@@ -1,7 +1,9 @@
+import path from "path";
 import { bodyParser } from "./body-parser";
 import { cookieParser } from "./cookie-parser";
 import cors from "./cors";
 import { use } from "./router";
+import serveStatic from "./serve-static";
 
 export function registerMiddlewares() {
     use(cors({
@@ -13,5 +15,6 @@ export function registerMiddlewares() {
         return next();
     });
     use(cookieParser())
+    use(serveStatic(path.join(process.cwd(), "public")));
     use(bodyParser({ limit: 1024 * 1024 }));
 }
