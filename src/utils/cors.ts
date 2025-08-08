@@ -18,7 +18,7 @@ export default function cors(options: CorsOptions = {}) {
   } = options;
 
   return (req: HttpRequest, next: () => HttpResponse) => {
-    const requestOrigin = req.headers["origin"] || "";
+    const requestOrigin = req.headers["origin"] as string || "";
 
     let allowOriginHeader = "";
     if (origin.includes("*")) {
@@ -32,7 +32,7 @@ export default function cors(options: CorsOptions = {}) {
     let allowHeadersValue = "";
     if (allowedHeaders.includes("*")) {
       // If browser sent Access-Control-Request-Headers, reflect them
-      const requested = req.headers["access-control-request-headers"];
+      const requested = req.headers["access-control-request-headers"] as string;
       if (requested) {
         allowHeadersValue = requested;
       } else {

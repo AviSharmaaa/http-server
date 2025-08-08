@@ -1,6 +1,6 @@
 export function cookieParser() {
     return (req: HttpRequest, next: () => HttpResponse) => {
-        const cookieHeader = req.headers["cookie"]
+        const cookieHeader = req.headers["cookie"] as string
         const cookies: Record<string, string> = {}
 
         if (!cookieHeader) return next()

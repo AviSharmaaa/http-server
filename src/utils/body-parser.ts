@@ -6,8 +6,8 @@ export function bodyParser(options: BodyParserOptions = {}) {
     const maxSize = options.limit || 1024 * 1024 //1 MB
 
     return (req: HttpRequest, next: () => HttpResponse) => {
-        const contentType = req.headers["content-type"]
-        const contentLength = parseInt(req.headers["content-length"] || "0", 10)
+        const contentType = req.headers["content-type"] as string
+        const contentLength = parseInt(req.headers["content-length"] as string|| "0", 10)
 
         if (contentLength > maxSize) {
             return {

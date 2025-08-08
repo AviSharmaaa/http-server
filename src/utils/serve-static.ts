@@ -27,7 +27,7 @@ export default function serveStatic(rootDir: string) {
 
         if (
             req.headers["if-none-match"] === etag ||
-            new Date(req.headers["if-modified-since"] || "") >= stat.mtime
+            new Date(req.headers["if-modified-since"] as string || "") >= stat.mtime
         ) {
             return {
                 statusCode: 304,

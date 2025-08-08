@@ -32,7 +32,6 @@ export function parseHttpRequest(raw: string): HttpRequest {
 
     const headers = parseHeaders(lines.slice(1));
 
-
     return {
         method,
         path,
