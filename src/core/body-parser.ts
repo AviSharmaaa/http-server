@@ -7,7 +7,7 @@ export function bodyParser(options: BodyParserOptions = {}) {
 
     return (req: HttpRequest, next: () => HttpResponse) => {
         const contentType = req.headers["content-type"] as string
-        const contentLength = parseInt(req.headers["content-length"] as string|| "0", 10)
+        const contentLength = parseInt(req.headers["content-length"] as string || "0", 10)
 
         if (contentLength > maxSize) {
             return {
@@ -21,7 +21,8 @@ export function bodyParser(options: BodyParserOptions = {}) {
     }
 }
 
-function parseBody(contentType: string, rawBody: string) {
+function parseBody(contentType: string, body: Buffer |null) {
+    const rawBody = body?.toString('ascii')
     if (!rawBody) return "";
 
     const mime = contentType.split(";")[0].trim().toLowerCase()

@@ -1,13 +1,13 @@
 import * as net from "net";
-import { registerRoutes } from "../utils/routes";
-import { registerMiddlewares } from "../utils/middlewares";
+import { registerRoutes } from "../core/routes";
+import { registerMiddlewares } from "../core/middlewares";
 import handleRawHttpData from "../utils/handle-raw-http-data";
 
 registerMiddlewares();
 registerRoutes();
 
 const server = net.createServer((socket) => {
-    const bufferRef = { buffer: "" }
+    const bufferRef = { buffer: Buffer.alloc(0) as Buffer }
 
     socket.on("data", (chunk) => { handleRawHttpData(bufferRef, chunk, socket) });
 

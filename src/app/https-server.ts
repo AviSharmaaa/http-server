@@ -1,7 +1,7 @@
 import tls from "tls";
 import fs from "fs";
-import { registerRoutes } from "../utils/routes";
-import { registerMiddlewares } from "../utils/middlewares";
+import { registerRoutes } from "../core/routes";
+import { registerMiddlewares } from "../core/middlewares";
 import handleRawHttpData from "../utils/handle-raw-http-data";
 
 registerMiddlewares();
@@ -13,9 +13,17 @@ const options = {
 };
 
 const server = tls.createServer(options, (socket) => {
-    let bufferRef = { buffer: "" }
+    let bufferRef = { buffer: Buffer.alloc(0) as Buffer }
 
-    socket.on("data", (chunk) => { handleRawHttpData(bufferRef, chunk, socket) });
+    socket.on("data", (chunk) => {
+        try {
+            handleRawHttpData(bufferRef, chunk, socket);
+        } catch (err) {
+            console.error("HTTPS handler error:", err);
+            socket.end();
+        }
+    });
+
 
     socket.on("error", (err) => {
         console.error("TLS Socket error:", err);

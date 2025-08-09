@@ -1,9 +1,9 @@
 import path from "path";
 import { bodyParser } from "./body-parser";
-import { cookieParser } from "./cookie-parser";
-import cors from "./cors";
+import { cookieParser } from "../utils/cookie-parser";
+import cors from "../utils/cors";
 import { use } from "./router";
-import serveStatic from "./serve-static";
+import serveStatic from "../utils/serve-static";
 
 export function registerMiddlewares() {
     use(cors({
