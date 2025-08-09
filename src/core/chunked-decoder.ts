@@ -10,90 +10,143 @@ export function createChunkedState(): ChunkedState {
     };
 }
 
-function parseHexSize(line: string): number | null {
-    const hex = line.split(";")[0].trim();
-    if (!/^[0-9a-fA-F]+$/.test(hex)) return null;
-    return parseInt(hex, 16);
-}
-
 /**
  * Feed bytes into the chunked decoder.
  * Returns number of bytes consumed from `buf`.
  */
 export function feedChunked(state: ChunkedState, buf: Buffer): number {
-    let offset = 0;
+  let offset = 0;
 
-    while (offset < buf.length && !state.done) {
-        if (state.trailerMode) {
-            // Collect trailers until CRLFCRLF
-            const idx = indexOfCrlfCrlf(buf, offset);
-            if (idx === -1) {
-                state.trailerBuf = Buffer.concat([state.trailerBuf, buf.subarray(offset)]);
-                offset = buf.length;
-                break;
-            } else {
-                state.trailerBuf = Buffer.concat([state.trailerBuf, buf.subarray(offset, idx + 4)]);
-                offset = idx + 4;
-                state.done = true;
-                break;
-            }
-        }
-
-        if (state.awaitingSize) {
-            // Need a full size line ending with CRLF; handle splits
-            const eol = indexOfCrlf(buf, offset);
-            if (eol === -1) {
-                state.partialLine = Buffer.concat([state.partialLine, buf.subarray(offset)]);
-                offset = buf.length;
-                break;
-            } else {
-                const lineBuf = Buffer.concat([state.partialLine, buf.subarray(offset, eol)]);
-                state.partialLine = Buffer.alloc(0);
-
-                const line = lineBuf.toString("utf8");
-                offset = eol + 2;
-
-                const size = parseHexSize(line);
-                if (size === null) throw new Error("Invalid chunk size line");
-                state.nextChunkSize = size;
-
-                if (size === 0) {
-                    // Terminal chunk: DO NOT consume anything here.
-                    // Enter trailer mode and let it consume CRLFCRLF (empty trailers)
-                    // or proper trailers followed by CRLF.
-                    state.trailerMode = true;
-                    continue;
-                }
-
-                state.awaitingSize = false; // next read will be chunk data (+ CRLF)
-            }
-        } else {
-            // Read chunk data + trailing CRLF
-            const need = state.nextChunkSize + 2; // data + CRLF
-            const available = buf.length - offset;
-            if (available < need) {
-                // Not enough bytes for full chunk yet
-                break;
-            }
-
-            const chunk = buf.subarray(offset, offset + state.nextChunkSize);
-            state.collected.push(chunk);
-            offset += state.nextChunkSize;
-
-            // Expect CRLF after the data
-            if (!startsWithCrlf(buf, offset)) {
-                throw new Error("Missing CRLF after chunk data");
-            }
-            offset += 2;
-
-            // Next iteration will read size line
-            state.awaitingSize = true;
-            state.nextChunkSize = 0;
-        }
+  while (offset < buf.length && !state.done) {
+    if (state.trailerMode) {
+      offset = parseTrailers(state, buf, offset);
+      break; // Exit to let caller handle consumed bytes
     }
 
-    return offset;
+    if (state.awaitingSize) {
+      offset = parseChunkSize(state, buf, offset);
+      continue;
+    }
+
+    offset = parseChunkData(state, buf, offset);
+  }
+
+  return offset;
 }
+
+function parseTrailers(state: ChunkedState, buf: Buffer, offset: number): number {
+  while (offset < buf.length) {
+    const lineResult = readLine(state, buf, offset);
+    if (!lineResult) {
+      // Incomplete line, need more data
+      return buf.length;
+    }
+
+    const { line, newOffset } = lineResult;
+    offset = newOffset;
+
+    if (line.length === 0) {
+      // Empty line = end of trailers
+      state.done = true;
+      break;
+    }
+
+    // Save trailer line
+    state.trailerBuf = Buffer.concat([
+      state.trailerBuf,
+      line,
+      Buffer.from("\r\n")
+    ]);
+  }
+
+  return offset;
+}
+
+function parseChunkSize(state: ChunkedState, buf: Buffer, offset: number): number {
+  const lineResult = readLine(state, buf, offset);
+  if (!lineResult) {
+    // Need more data for complete size line
+    return buf.length;
+  }
+
+  const { line, newOffset } = lineResult;
+  const chunkSize = parseHexSize(line.toString("utf8"));
+
+  state.nextChunkSize = chunkSize;
+  state.awaitingSize = false;
+
+  if (chunkSize === 0) {
+    // Terminal chunk - switch to trailer mode
+    state.trailerMode = true;
+  }
+
+  return newOffset;
+}
+
+function parseChunkData(state: ChunkedState, buf: Buffer, offset: number): number {
+  const dataSize = state.nextChunkSize;
+  const totalNeeded = dataSize + 2; // data + CRLF
+
+  if (buf.length - offset < totalNeeded) {
+    // Not enough data yet
+    return buf.length;
+  }
+
+  // Extract chunk data
+  const data = buf.subarray(offset, offset + dataSize);
+  state.collected.push(data);
+  offset += dataSize;
+
+  // Verify trailing CRLF
+  if (!startsWithCrlf(buf, offset)) {
+    throw new Error("Missing CRLF after chunk data");
+  }
+  offset += 2;
+
+  // Reset for next chunk
+  state.awaitingSize = true;
+  state.nextChunkSize = 0;
+
+  return offset;
+}
+
+// Helper: Read a complete CRLF-terminated line
+function readLine(state: ChunkedState, buf: Buffer, offset: number): { line: Buffer; newOffset: number } | null {
+  const eol = indexOfCrlf(buf, offset);
+  if (eol === -1) {
+    // Incomplete line - save fragment
+    state.partialLine = Buffer.concat([
+      state.partialLine,
+      buf.subarray(offset)
+    ]);
+    return null;
+  }
+
+  // Complete line found
+  let line: Buffer;
+  if (state.partialLine.length > 0) {
+    // Join with previous fragment
+    line = Buffer.concat([state.partialLine, buf.subarray(offset, eol)]);
+    state.partialLine = Buffer.alloc(0);
+  } else {
+    line = buf.subarray(offset, eol);
+  }
+
+  return { line, newOffset: eol + 2 }; // +2 for CRLF
+}
+
+// Helper: Parse hex chunk size, ignoring extensions
+function parseHexSize(line: string): number {
+  const semi = line.indexOf(";");
+  const hexStr = (semi === -1 ? line : line.slice(0, semi)).trim();
+
+  if (!/^[0-9a-fA-F]+$/.test(hexStr)) {
+    throw new Error(`Invalid chunk size: ${hexStr}`);
+  }
+
+  return parseInt(hexStr, 16);
+}
+
 
 export function getChunkedBody(state: ChunkedState): Buffer | null {
     if (!state.done) return null;
@@ -109,11 +162,4 @@ function indexOfCrlf(buf: Buffer, from: number): number {
 
 function startsWithCrlf(buf: Buffer, at: number): boolean {
     return at + 1 < buf.length && buf[at] === 13 && buf[at + 1] === 10;
-}
-
-function indexOfCrlfCrlf(buf: Buffer, from: number): number {
-    for (let i = from; i + 3 < buf.length; i++) {
-        if (buf[i] === 13 && buf[i + 1] === 10 && buf[i + 2] === 13 && buf[i + 3] === 10) return i; // \r\n\r\n
-    }
-    return -1;
 }
