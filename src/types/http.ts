@@ -10,3 +10,9 @@ interface HttpRequest {
     body: Buffer | null;
     raw: string;
 }
+
+interface HttpResponse {
+    statusCode: number;
+    headers?: HeadersMap;
+    body: string | Buffer | Uint8Array;
+}

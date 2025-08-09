@@ -1,8 +1,8 @@
 import * as net from "net";
-import { parseHttpRequest, parseStartLineAndHeaders } from "../core/reqest-parser";
+import { parseHttpRequest, parseStartLineAndHeaders } from "../core/request-parser";
 import { CHUNKED_REGEX } from "./constants";
 import { getContentLength } from "./common";
-import { routeRequest } from "../core/router";
+import { routeRequest } from "../core/router/router";
 import { buildHttpResponse } from "./response-builder";
 import { createChunkedState, feedChunked, getChunkedBody } from "../core/chunked-decoder";
 
@@ -59,7 +59,7 @@ export default function handleRawHttpData(bufferRef: { buffer: Buffer }, chunk: 
             socket[SAVED_HEADER_PART] = undefined;
 
             const fullRequest = Buffer.concat([headerPart, doneBody]);
-            
+
             handleRequest(fullRequest, socket);
 
             // continue to process any pipelined request already buffered

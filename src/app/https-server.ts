@@ -1,7 +1,7 @@
 import tls from "tls";
 import fs from "fs";
-import { registerRoutes } from "../core/routes";
-import { registerMiddlewares } from "../core/middlewares";
+import { registerRoutes } from "../core/router/routes";
+import { registerMiddlewares } from "../core/middleware/middlewares";
 import handleRawHttpData from "../utils/handle-raw-http-data";
 
 registerMiddlewares();
