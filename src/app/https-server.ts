@@ -3,6 +3,7 @@ import fs from "fs";
 import { registerRoutes } from "../core/router/routes";
 import { registerMiddlewares } from "../core/middleware/middlewares";
 import handleRawHttpData from "../utils/handle-raw-http-data";
+import { KEEP_ALIVE_TIMEOUT_MS } from "../utils/constants";
 
 registerMiddlewares();
 registerRoutes();
@@ -14,6 +15,8 @@ const options = {
 
 const server = tls.createServer(options, (socket) => {
     let bufferRef = { buffer: Buffer.alloc(0) as Buffer }
+
+    socket.setTimeout(KEEP_ALIVE_TIMEOUT_MS, () => socket.end())
 
     socket.on("data", (chunk) => {
         try {

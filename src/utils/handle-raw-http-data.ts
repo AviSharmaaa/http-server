@@ -3,7 +3,7 @@ import {
     parseHttpRequest,
     parseStartLineAndHeaders,
 } from "../core/request-parser";
-import { CHUNKED_REGEX, DEFAULT_MAX_BODY_BYTES } from "./constants";
+import { CHUNKED_REGEX, DEFAULT_MAX_BODY_BYTES, KEEP_ALIVE_MAX } from "./constants";
 import { getContentLength, looksLikeRequestLine, writeErrorAndMaybeClose } from "./common";
 import { routeRequest } from "../core/router/router";
 import { buildHttpResponse } from "./response-builder";
@@ -12,6 +12,7 @@ import {
     feedChunked,
     getChunkedBody,
 } from "../core/chunked-decoder";
+import { nextReqCount } from "./conn-state";
 
 const CHUNKED_STATE = Symbol("chunkedState");
 const SAVED_HEADER_PART = Symbol("savedHeaderPart");
@@ -24,10 +25,22 @@ type SocketWithState = net.Socket & {
 function handleRequest(full: Buffer, socket: net.Socket) {
     try {
         const req = parseHttpRequest(full);
-        const res = routeRequest(req);
-        const raw = buildHttpResponse(res);
+        let res = routeRequest(req);
+
+        // HEAD => no body, but keep Content-Length
+        if (req.method === "HEAD") {
+            const len = Buffer.isBuffer(res.body) ? res.body.length : Buffer.byteLength(String(res.body ?? ""));
+            res = { ...res, headers: { ...(res.headers || {}), "Content-Length": String(len) }, body: Buffer.alloc(0) };
+        }
+
+        const count = nextReqCount(socket);
+        const clientWantsClose = String((req.headers as any)["connection"] || "").toLowerCase() === "close";
+        const underMax = count < KEEP_ALIVE_MAX;
+        const keep = !clientWantsClose && underMax;
+
+        const raw = buildHttpResponse(res, keep);
         socket.write(raw);
-        if ((req.headers as any)["connection"] === "close") socket.end();
+        if (!keep) socket.end();
     } catch (e) {
         console.error("Request handling error:", e);
         writeErrorAndMaybeClose(socket, 400, false)

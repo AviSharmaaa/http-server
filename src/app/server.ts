@@ -2,12 +2,15 @@ import * as net from "net";
 import { registerRoutes } from "../core/router/routes";
 import { registerMiddlewares } from "../core/middleware/middlewares";
 import handleRawHttpData from "../utils/handle-raw-http-data";
+import { KEEP_ALIVE_TIMEOUT_MS } from "../utils/constants";
 
 registerMiddlewares();
 registerRoutes();
 
 const server = net.createServer((socket) => {
     const bufferRef = { buffer: Buffer.alloc(0) as Buffer }
+
+    socket.setTimeout(KEEP_ALIVE_TIMEOUT_MS, () => socket.end())
 
     socket.on("data", (chunk) => { handleRawHttpData(bufferRef, chunk, socket) });
 
