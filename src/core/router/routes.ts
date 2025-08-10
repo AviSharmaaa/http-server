@@ -20,4 +20,10 @@ export function registerRoutes() {
         statusCode: 200,
         body: `Deleted resource`,
     }));
+
+    addRoute("GET", "/hello", () => ({
+        statusCode: 200,
+        headers: { "Content-Type": "text/plain" },
+        body: "Hello from HTTPS server!",
+    }));
 }
