@@ -1,25 +1,25 @@
 import * as net from "net";
-import { parseHttpRequest, parseStartLineAndHeaders } from "../core/request-parser";
-import { CHUNKED_REGEX } from "./constants";
-import { getContentLength } from "./common";
+import {
+    parseHttpRequest,
+    parseStartLineAndHeaders,
+} from "../core/request-parser";
+import { CHUNKED_REGEX, DEFAULT_MAX_BODY_BYTES } from "./constants";
+import { getContentLength, looksLikeRequestLine, writeErrorAndMaybeClose } from "./common";
 import { routeRequest } from "../core/router/router";
 import { buildHttpResponse } from "./response-builder";
-import { createChunkedState, feedChunked, getChunkedBody } from "../core/chunked-decoder";
+import {
+    createChunkedState,
+    feedChunked,
+    getChunkedBody,
+} from "../core/chunked-decoder";
 
 const CHUNKED_STATE = Symbol("chunkedState");
 const SAVED_HEADER_PART = Symbol("savedHeaderPart");
 
 type SocketWithState = net.Socket & {
-    [CHUNKED_STATE]?: ChunkedState,
+    [CHUNKED_STATE]?: ChunkedState;
     [SAVED_HEADER_PART]?: Buffer;
-}
-
-function looksLikeRequestLine(buf: Buffer): boolean {
-    const eol = buf.indexOf("\r\n");
-    if (eol === -1) return false;
-    const line = buf.toString("ascii", 0, eol);
-    return /^[A-Z]+ [^\s]+ HTTP\/1\.[01]$/.test(line);
-}
+};
 
 function handleRequest(full: Buffer, socket: net.Socket) {
     try {
@@ -30,13 +30,16 @@ function handleRequest(full: Buffer, socket: net.Socket) {
         if ((req.headers as any)["connection"] === "close") socket.end();
     } catch (e) {
         console.error("Request handling error:", e);
-        socket.write("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
-        socket.end();
+        writeErrorAndMaybeClose(socket, 400, false)
     }
 }
 
-
-export default function handleRawHttpData(bufferRef: { buffer: Buffer }, chunk: Buffer, socket: SocketWithState) {
+export default function handleRawHttpData(
+    bufferRef: { buffer: Buffer },
+    chunk: Buffer,
+    socket: SocketWithState,
+    maxBodyBytes = DEFAULT_MAX_BODY_BYTES
+) {
     // Append incoming bytes
     bufferRef.buffer = Buffer.concat([bufferRef.buffer, chunk]);
 
@@ -45,9 +48,19 @@ export default function handleRawHttpData(bufferRef: { buffer: Buffer }, chunk: 
         // feed these bytes straight into the chunked decoder (no header parsing).
         if (socket[CHUNKED_STATE] && !looksLikeRequestLine(bufferRef.buffer)) {
             const state = socket[CHUNKED_STATE]!;
-            const consumed = feedChunked(state, bufferRef.buffer);
-            const doneBody = getChunkedBody(state);
+            let consumed = 0
+            try {
+                consumed = feedChunked(state, bufferRef.buffer, maxBodyBytes);
+            } catch (error: any) {
+                bufferRef.buffer = bufferRef.buffer.subarray(consumed);
+                const code = /too large/i.test(error.message) ? 413 : 400;
+                socket[CHUNKED_STATE] = undefined
+                socket[SAVED_HEADER_PART] = undefined;
+                writeErrorAndMaybeClose(socket, code, false)
+                return;
+            }
 
+            const doneBody = getChunkedBody(state);
             // slice consumed body bytes
             bufferRef.buffer = bufferRef.buffer.subarray(consumed);
 
@@ -67,32 +80,36 @@ export default function handleRawHttpData(bufferRef: { buffer: Buffer }, chunk: 
         }
 
         // Need headers block to proceed to new request: find CRLFCRLF
-        const headerEndIndex = bufferRef.buffer.indexOf("\r\n\r\n")
-        if (headerEndIndex === -1 || !looksLikeRequestLine(bufferRef.buffer)) return;
-
+        const headerEndIndex = bufferRef.buffer.indexOf("\r\n\r\n");
+        if (headerEndIndex === -1 || !looksLikeRequestLine(bufferRef.buffer))
+            return;
 
         const headerEnd = headerEndIndex + 4;
-        const headerPart = bufferRef.buffer.subarray(0, headerEnd)
-        const { headers } = parseStartLineAndHeaders(headerPart)
-
-
-        // Handle Expect: 100-continue
-        const expect = String(headers["expect"] || "").toLowerCase();
-        if (expect.includes("100-continue")) {
-            socket.write("HTTP/1.1 100 Continue\r\n\r\n");
-        }
-
+        const headerPart = bufferRef.buffer.subarray(0, headerEnd);
+        const { headers } = parseStartLineAndHeaders(headerPart);
 
         //decide body farming
         const transferEncoding = String(headers["transfer-encoding"] || "").toLowerCase();
-        const isChunked = CHUNKED_REGEX.test(transferEncoding)
+        const isChunked = CHUNKED_REGEX.test(transferEncoding);
+        const expect = String(headers["expect"] || "").toLowerCase();
 
         if (!isChunked) {
-            const contentLength = getContentLength(headers)
-            const totalNeeded = headerEnd + contentLength
+            const contentLength = getContentLength(headers);
+            if (contentLength > maxBodyBytes) {
+                writeErrorAndMaybeClose(socket, 413, false);
+                bufferRef.buffer = bufferRef.buffer.subarray(headerEnd);
+                return;
+            }
 
-            if (bufferRef.buffer.length < totalNeeded) return // wait for full body
-            const fullRequest = bufferRef.buffer.subarray(0, totalNeeded)
+            // If Expect: 100-continue, we’re ok to proceed
+            if (expect.includes("100-continue")) {
+                socket.write("HTTP/1.1 100 Continue\r\n\r\n");
+            }
+
+            const totalNeeded = headerEnd + contentLength;
+
+            if (bufferRef.buffer.length < totalNeeded) return; // wait for full body
+            const fullRequest = bufferRef.buffer.subarray(0, totalNeeded);
             bufferRef.buffer = bufferRef.buffer.subarray(totalNeeded); // keep-alive: slice consumed
 
             handleRequest(fullRequest, socket);
@@ -104,13 +121,24 @@ export default function handleRawHttpData(bufferRef: { buffer: Buffer }, chunk: 
             socket[SAVED_HEADER_PART] = headerPart;
         }
 
-        const state = socket[CHUNKED_STATE]
+        const state = socket[CHUNKED_STATE];
 
         // Feed only the body segment after headers
-        const bodySlice = bufferRef.buffer.subarray(headerEnd)
-        const consumedBodyBytes = feedChunked(state, bodySlice)
-        const doneBody = getChunkedBody(state);
+        const bodySlice = bufferRef.buffer.subarray(headerEnd);
+        let consumedBodyBytes = 0
+        try {
+            consumedBodyBytes = feedChunked(state, bodySlice, maxBodyBytes);
+        } catch (error: any) {
+            // On error, drop headers + consumed body bytes from the buffer
+            bufferRef.buffer = bufferRef.buffer.subarray(headerEnd + consumedBodyBytes);
+            const code = /too large/i.test(String(error?.message)) ? 413 : 400;
+            socket[CHUNKED_STATE] = undefined;
+            socket[SAVED_HEADER_PART] = undefined;
+            writeErrorAndMaybeClose(socket, code, false);
+            return;
+        }
 
+        const doneBody = getChunkedBody(state);
         bufferRef.buffer = bufferRef.buffer.subarray(headerEnd + consumedBodyBytes);
 
         if (!doneBody) {
@@ -125,7 +153,5 @@ export default function handleRawHttpData(bufferRef: { buffer: Buffer }, chunk: 
         const fullRequest = Buffer.concat([headerPart, doneBody]);
         handleRequest(fullRequest, socket);
         // loop to handle any next pipelined request
-
     }
 }
-

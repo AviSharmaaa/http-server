@@ -5,5 +5,6 @@ interface ChunkedState {
     collected: Buffer[];
     trailerMode: boolean;
     trailerBuf: Buffer;
-    partialLine: Buffer; // for split size-lines across packets
+    partialLine: Buffer;          // for split size-lines across packets
+    bytesSoFar: number;           // running count of payload bytes
 };
