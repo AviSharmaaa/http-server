@@ -82,7 +82,6 @@ export const routeRequest = (req: HttpRequest): HttpResponse => {
         } else {
             handler = () => ({
                 statusCode: 404,
-                headers: { "Content-Type": "text/plain" },
                 body: "Not Found",
             });
         }

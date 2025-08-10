@@ -84,7 +84,21 @@ export default function handleRawHttpData(
             socket[CHUNKED_STATE] = undefined;
             socket[SAVED_HEADER_PART] = undefined;
 
-            const fullRequest = Buffer.concat([headerPart, doneBody]);
+            const { method, path, version, headers } = parseStartLineAndHeaders(headerPart);
+            delete (headers as any)["transfer-encoding"];
+            (headers as any)["content-length"] = String(doneBody.length);
+
+            const firstLine = `${method} ${path} ${version}\r\n`;
+            const headerLines = Object.entries(headers)
+                .map(([k, v]) =>
+                    Array.isArray(v)
+                        ? v.map((x) => `${k}: ${x}`).join("\r\n")
+                        : `${k}: ${v}`
+                )
+                .join("\r\n");
+            const rebuiltHeader = Buffer.from(firstLine + headerLines + "\r\n\r\n", "ascii");
+
+            const fullRequest = Buffer.concat([rebuiltHeader, doneBody]);
 
             handleRequest(fullRequest, socket);
 
@@ -163,7 +177,19 @@ export default function handleRawHttpData(
         socket[CHUNKED_STATE] = undefined;
         socket[SAVED_HEADER_PART] = undefined;
 
-        const fullRequest = Buffer.concat([headerPart, doneBody]);
+        const { method, path, version, headers: hdrs } = parseStartLineAndHeaders(headerPart);
+        delete (hdrs as any)["transfer-encoding"];
+        (hdrs as any)["content-length"] = String(doneBody.length);
+
+        const firstLine = `${method} ${path} ${version}\r\n`;
+        const headerLines = Object.entries(hdrs)
+            .map(([k, v]) =>
+                Array.isArray(v) ? v.map((x) => `${k}: ${x}`).join("\r\n") : `${k}: ${v}`
+            )
+            .join("\r\n");
+        const rebuiltHeader = Buffer.from(firstLine + headerLines + "\r\n\r\n", "ascii");
+
+        const fullRequest = Buffer.concat([rebuiltHeader, doneBody]);
         handleRequest(fullRequest, socket);
         // loop to handle any next pipelined request
     }

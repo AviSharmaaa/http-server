@@ -1,21 +1,5 @@
+import { statusText } from "./common";
 import { KEEP_ALIVE_MAX, KEEP_ALIVE_TIMEOUT_MS } from "./constants";
-
-function statusText(code: number): string {
-    switch (code) {
-        case 200: return "OK";
-        case 204: return "No Content";
-        case 301: return "Moved Permanently";
-        case 302: return "Found";
-        case 304: return "Not Modified";
-        case 400: return "Bad Request";
-        case 403: return "Forbidden";
-        case 404: return "Not Found";
-        case 405: return "Method Not Allowed";
-        case 413: return "Payload Too Large";
-        case 500: return "Internal Server Error";
-        default: return "OK";
-    }
-}
 
 export function buildHttpResponse(res: HttpResponse, keepAlive = true): Buffer {
     const headers = { ...(res.headers || {}) }

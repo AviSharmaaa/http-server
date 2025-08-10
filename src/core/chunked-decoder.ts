@@ -44,7 +44,7 @@ export function feedChunked(
 
     // 3) Read chunk data + trailing CRLF
     const next = parseChunkData(state, buf, offset, maxBytes);
-    if (next === null) return buf.length; // need more data for full chunk
+    if (next === null) return offset; // need more data for full chunk
     offset = next;
   }
 
