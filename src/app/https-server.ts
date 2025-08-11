@@ -4,14 +4,12 @@ import { registerRoutes } from "../core/router/routes";
 import { registerMiddlewares } from "../core/middleware/middlewares";
 import handleRawHttpData from "../utils/handle-raw-http-data";
 import { KEEP_ALIVE_TIMEOUT_MS } from "../utils/constants";
+import { getDevCert } from "../utils/dev-cert";
 
 registerMiddlewares();
 registerRoutes();
 
-const options = {
-    key: fs.readFileSync("server.key"),
-    cert: fs.readFileSync("server.crt"),
-};
+const options = getDevCert()
 
 const server = tls.createServer(options, (socket) => {
     let bufferRef = { buffer: Buffer.alloc(0) as Buffer }
