@@ -82,7 +82,6 @@ export function getDevCert(): { key: Buffer; cert: Buffer } {
   ensureDir(CERT_DIR);
 
   if (fs.existsSync(KEY_PATH) && fs.existsSync(CERT_PATH)) {
-    console.warn(CERT_DIR);
     return { key: fs.readFileSync(KEY_PATH), cert: fs.readFileSync(CERT_PATH) };
   }
 
