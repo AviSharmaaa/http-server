@@ -14,21 +14,28 @@ function ensureDir(p: string) {
 function tryTrustOnMac(certPath: string) {
   try {
     // login keychain (no sudo)
-    const loginKC = path.join(
-      process.env.HOME || "",
-      "Library/Keychains/login.keychain-db"
-    );
+    const systemKC = "/Library/Keychains/System.keychain";
+    const absCert = path.resolve(certPath);
     execFileSync(
-      "security",
-      ["add-trusted-cert", "-d", "-r", "trustRoot", "-k", loginKC, certPath],
-      { stdio: "ignore" }
+      "sudo",
+      [
+        "security",
+        "add-trusted-cert",
+        "-d",
+        "-r",
+        "trustRoot",
+        "-k",
+        systemKC,
+        absCert,
+      ],
+      { stdio: "inherit" }
     );
-    console.log("🔐 macOS: Dev cert trusted in login keychain.");
+    console.log("🔐 macOS: Dev cert trusted in system keychain.");
     return;
   } catch {}
   console.warn(
-    "⚠️  macOS: Could not auto-trust in login keychain.\n" +
-      "Try system keychain (requires sudo):\n" +
+    "⚠️  macOS: Could not auto-trust in system keychain.\n" +
+      "Try running the command manually:\n" +
       `  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${certPath}`
   );
 }
@@ -75,6 +82,7 @@ export function getDevCert(): { key: Buffer; cert: Buffer } {
   ensureDir(CERT_DIR);
 
   if (fs.existsSync(KEY_PATH) && fs.existsSync(CERT_PATH)) {
+    console.warn(CERT_DIR);
     return { key: fs.readFileSync(KEY_PATH), cert: fs.readFileSync(CERT_PATH) };
   }
 
